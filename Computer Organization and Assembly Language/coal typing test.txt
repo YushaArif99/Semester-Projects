@@ -1,0 +1,499 @@
+TITLE Reading a File  (ReadFile.asm)
+
+INCLUDE Irvine32.inc
+
+BUFFER_SIZE = 5000
+
+.data
+
+buffer BYTE BUFFER_SIZE DUP(?)
+filename    BYTE "C:\Users\haroon traders\Downloads\Documents\COAL\paragraph.txt", 0
+fileHandle  HANDLE ?
+temp dd 0
+paragraph BYTE 600 DUP(?)
+check BYTE 600 DUP(?)
+startTime DWORD ?
+endTime DWORD ?
+
+prompt BYTE "   WELCOME TO TYPING SPEED TEST   ", 0
+prompt1 BYTE "THE GENERATED PARAGRAPH IS: ", 0
+prompt2 BYTE "PLEASE ENTER THE ABOVE PARAGRAPH: ", 0
+prompt3 BYTE "THE ERRORS ARE: ",0
+prompt4 BYTE "Your time is over! ", 0
+instructions BYTE "Please read the instructions carefully: ",0
+instruction1 BYTE "1_ You have only 1 minute to write the whole paragraph.", 0
+instruction2 BYTE "2_ You are not allowed to edit the text once entered. So please write carefully.",0
+ask BYTE "Press enter to start the test.",0
+exit_prog BYTE " Press 'E' for exit: ",0
+ask_ BYTE 1 DUP(?)
+
+str0 BYTE "RESULTS: ", 0
+str1 byte "Total words:               ",0
+str2 byte "Total right words:         ",0
+str3 byte "Total wrong words:         ",0
+str4 byte "WORDS PER MINUTE (APPROX): ",0
+str5 byte "ACCURACY (APPROX):         ",0
+count dword 0
+rightwords dword 0
+wrongwords dword 0
+WPM DWORD 0
+perct_WPM BYTE 0
+
+.code
+
+Read PROC
+		
+	; Open the file for input.
+		mov	edx, OFFSET filename
+		call	OpenInputFile
+		mov	fileHandle,eax
+
+	; Check for errors.
+		cmp	eax,INVALID_HANDLE_VALUE		; error opening file?
+		jne	file_ok							; no: skip
+		call	WriteWindowsMsg
+		jmp	quit							; and quit
+
+	file_ok:
+
+	; Read the file into a buffer.
+		mov	edx,OFFSET buffer
+		mov	ecx,BUFFER_SIZE
+		call	ReadFromFile
+		
+		;Invoke SetFilePointer,
+		;filehandle, 10, 0, file_begin 
+		
+		jnc	check_buffer_size		; error reading?
+		call	WriteWindowsMsg
+		jmp	close_file
+	
+	check_buffer_size:
+		;Invoke SetFilePointer,
+		;filehandle, 5, 0, file_current
+		
+		cmp	eax,BUFFER_SIZE			; buffer large enough?
+		jb	buf_size_ok				; yes
+		jmp	quit					; and quit
+	
+	buf_size_ok:	
+		mov	buffer[eax],0		; insert null terminator
+		call	Crlf
+
+	close_file:
+		mov	eax,fileHandle
+		call	CloseFile
+
+	quit:
+	ret
+Read ENDP
+
+;======================================================================
+
+make_paragraph PROC 
+	
+	mov edx, 0
+	mov ecx, 0
+
+	mov eax, 2000	
+	call Randomize
+	mov ebx, 0
+	mov bl,  "."
+	
+	;LOOP TO GET RANDOM PARAGRAPH
+	;GETTING INITIAL POINT OF PARAGRAPH
+	
+	L1:
+		mov eax, 2000
+		call RandomRange
+		mov esi, eax
+		CMP BUFFER[ESI], BL
+		JE _OUT
+	LOOP L1
+		
+	_OUT:
+		INC ESI
+		MOV EAX, ESI
+
+		;PARAGRAPH LENGTH IS 600
+		ADD ESI, 600
+
+		;INFINITE LOOP
+		mov ecx, -1
+
+		MOV BL, "."
+
+		;FINDING THE LAST INDEX OF A PARAGRAPH IN SUCH A WAY THAT IT MUST END WITH .
+		L2:
+			CMP BUFFER[ESI], BL
+			JE _DO
+			DEC ESI
+		LOOP L2
+
+		_DO:
+		
+		;SET ECX such that the loop must end on a sentence with .
+		mov ecx, esi
+		sub ecx, eax
+		INC ECX
+
+		;SET ESI TO THE STARTING OFFSET OF A PARAGRAPH
+		MOV ESI, OFFSET BUFFER
+		ADD ESI, EAX
+		
+		mov edi, OFFSET paragraph 
+		
+		CLD
+		REP MOVSB
+
+
+	;DISPLAY PARAGRAPH
+	mov edx, OFFSET PARAGRAPH
+	call writestring
+
+	ret
+make_paragraph ENDP
+
+;=============================================
+
+other_errors proc
+
+	mov ebx, esi
+	mov edx, edi
+
+	more_errors:
+	cmp paragraph[ebx],0 
+	je end_funct
+
+	cmp paragraph[ebx],' '
+	je end_funct
+
+	mov cl, paragraph[ebx]
+	cmp check[edx] ,cl
+	je rest
+
+	push eax
+	push edx
+
+	mov eax, white + (lightred*16)
+	call settextcolor
+	mov al, paragraph[ebx]
+	call writechar
+
+	pop edx
+	pop eax
+
+	jmp n_itr
+
+	rest:
+	mov eax, lightGray + (black*16)
+	call settextcolor
+	mov al, paragraph[ebx]
+	call writechar
+
+
+	n_itr:
+
+	inc ebx
+	inc edx
+
+	jnz more_errors
+
+	end_funct:
+	mov al, ' '
+	call writechar
+	ret
+other_errors endp
+
+;==================================================
+
+error_finder proc
+	mov esi,0
+	mov edi,0
+
+	myloop:
+	cmp paragraph[esi],0
+	je ret_main
+
+
+	mov bl, check[edi]
+
+	cmp paragraph[esi], bl
+	jne print_
+
+	push eax
+	mov eax, lightGray + (black*16)
+	call settextcolor
+	mov al, paragraph[esi]
+	call writechar
+	pop eax
+
+	cmp paragraph[esi],' '
+    je add_cword
+    jmp end_if
+
+	add_cword: 
+	add rightwords,1
+
+	jmp end_if
+
+	print_:
+
+	call other_errors
+	add wrongwords,1
+
+	; inc as long as space not found
+	find_space:
+	cmp paragraph[esi],0 
+	je ret_main
+
+	cmp paragraph[esi],' '
+	je find_char
+	inc esi
+	loop find_space
+
+	; inc as long as 1st char of new word not found
+	find_char:
+	cmp paragraph[esi],' '
+	jne find_space2
+	inc esi
+	loop find_char
+
+	; do the same for check
+	; inc as long as space not found
+	find_space2:
+	cmp check[edi],0
+	je print_rest
+
+	cmp check[edi],' '
+	je find_char2
+	inc edi
+	loop find_space2
+
+	; inc as long as 1st char of new word not found
+	find_char2:
+	cmp check[edi],' '
+	jne next_itr
+	inc edi
+	loop find_char2
+
+
+	end_if:
+	inc esi
+	inc edi
+
+	next_itr:
+	jnz myloop
+
+	print_rest:
+	cmp paragraph[esi],0
+	je ret_main
+
+	cmp paragraph[esi],' '
+	je add_eword
+	jmp dont_add
+
+	add_eword:
+	add wrongwords,1
+
+	dont_add:
+	mov eax, white + (lightred*16)
+	call settextcolor
+	mov al, paragraph[esi]
+	call writechar
+
+	inc esi
+	loop print_rest
+
+	ret_main:
+	ret
+error_finder endp
+
+main PROC
+	
+	mov dh, 1
+	mov dl, 50
+	call gotoxy
+
+	mov eax, BLUE + (lightgray*16)
+	call settextcolor
+
+
+	mov edx, OFFSET PROMPT
+	call writestring
+
+	call crlf
+	call crlf
+
+	mov eax, lightGray + (black*16)
+	call settextcolor
+
+	mov edx, OFFSET instructions
+	call writestring
+	call crlf
+	mov edx, OFFSET instruction1
+	call writestring
+	call crlf
+	mov edx, offset instruction2
+	call writestring
+
+	call crlf
+	call crlf
+
+	mov edx, OFFSET PROMPT1
+	call writestring
+
+	call crlf
+	call crlf
+
+	mov eax, green + (black*16)
+	call settextcolor
+
+	call Read
+	call make_paragraph
+	
+	mov eax, lightGray + (black*16)
+	call settextcolor
+
+	call crlf
+	call crlf
+
+;	call GetMseconds
+;	mov startTime, eax
+
+;	mov edx, OFFSET CHECK
+;	mov ecx, 600
+	
+	mov edx, offset ask
+	call writestring
+	
+	mov edx, offset ask_
+	mov ecx, 1
+	call readstring
+
+	call crlf
+
+	mov edx, OFFSET prompt2
+	call writestring
+
+	call crlf
+	
+
+	mov ecx, -1
+	call crlf
+
+
+	mov eax, 0
+
+	call GetMseconds
+	mov startTime, eax
+	mov esi, 0
+
+	L1:
+	mov edx, 0
+	call GetMseconds
+	sub eax, startTime
+	push eax
+
+	mov eax, 0
+	call readchar
+	call writechar
+
+	mov CHECK[ESI], al
+	inc esi
+	
+	pop eax
+	cmp eax, 30000
+	jae m1
+
+	jmp L1
+
+	m1:
+	
+	call crlf
+	call crlf
+	
+	mov edx, OFFSET prompt3
+	call writestring
+
+	call crlf
+	call crlf
+
+	call error_finder
+	
+	mov eax, lightGray + (black*16)
+	call settextcolor
+	
+	call crlf
+	call crlf
+	
+	mov edx, OFFSET prompt4
+	call writestring
+
+	call crlf
+	call crlf
+
+	mov edx, offset str0
+	call writestring
+	call crlf
+
+	mov edx, OFFSET str1
+	call writestring
+	mov eax, rightwords
+	add eax, wrongwords
+	call writedec
+	call crlf
+
+	mov edx, offset str2
+	call writestring
+	mov eax, rightwords
+	call writedec
+	call crlf
+
+	mov edx, OFFSET str3
+	call writestring 
+	mov eax, wrongwords
+	call writedec
+	call crlf
+	
+	mov edx, OFFSET str4
+	call writestring
+	mov eax, rightwords
+	add eax, wrongwords
+	call writedec
+	call crlf
+	
+	mov ebx, eax
+
+	mov edx, OFFSET str5
+	call writestring
+	
+	mov eax, 0
+	mov eax, rightwords
+	mov dl, 100
+	mul dl
+	div bl
+	mov perct_wpm, al
+	movzx eax, perct_wpm
+	call writedec
+	mov edx, 0
+	mov al, '%'
+	call writechar
+	call crlf
+
+	call crlf
+	call crlf
+
+	mov edx, offset exit_prog
+	call writestring
+	exit_loop:
+	call readchar
+	cmp al,'E'
+	je exit_main
+	loop exit_loop
+
+	exit_main:
+	call crlf
+   	exit
+main ENDP
+END main
