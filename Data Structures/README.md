@@ -1,5 +1,6 @@
 
 The main idea behind the project is to develop an algorithm that efficiently searches for a DNA corpus from a large data set taking into consideration the Time and Space Complexity of that algorithm
+
 GOALS:
 1.	Create a Suffix Trie using a tree based Data Structure
 2.	Use that Trie to develop a searching algorithm that significantly reduces the Time Complexity of searching for a specific suffix or substring in that trie.
