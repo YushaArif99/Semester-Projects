@@ -1,5 +1,2 @@
-# Remote Desktop Control
-
-# Abstract:
-
-In today’s era, every organization whether it’s a company or a college wants to have look on activities performed by employees/students on their respective computers. To solve this problem, Remote Desktop Controlling comes into picture, allowing to remotely control every action being taken by anyone on a desktop. Through this, an administrator or a faculty can control their client’s desktop to help them in resolving any issue or problem by having access of their hardware’s control on Keyboard, Mouse etc. Our project aim is to develop such an application which allows a server desktop to control another client desktop.In our project, we have implemented socket programming in Python using Twisted , which is an event-driven networking engine written in python to implement custom network applications In our project, one PC will behave as a server and the other will behave as a client. The server PC will be the controller whereas the client PC will be the controllee. The connection can be setup via LAN or WAN. 
+# Remote-Desktop-Controller
+Remote Desktop Controller in python. 
